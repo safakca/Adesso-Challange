@@ -1,5 +1,6 @@
 ﻿using AdessoWorldLeague.Data;
 using AdessoWorldLeague.Models;
+using AdessoWorldLeague.Services.Dtos;
 using Microsoft.EntityFrameworkCore;
 
 namespace AdessoWorldLeague.Services;
@@ -8,54 +9,94 @@ public class DrawService : IDrawService
 {
     private readonly AppDbContext _context;
 
-	public DrawService(AppDbContext context)
-	{
-        _context = context;
-	}
-
-    public async Task<DrawResult> DrawTeamsAsync(int groupCount, string drawnBy)
+    public DrawService(AppDbContext context)
     {
-        if (groupCount != 4 && groupCount != 8)
-            throw new ArgumentException("Group count must be either  4 or 8.");
+        _context = context;
+    }
 
-        var allTeams = await _context.Teams.ToListAsync();
-        var groups = GenerateGroups(groupCount: groupCount, allTeams: allTeams);
-        var drawResult = new DrawResult
+    public async Task<DrawResultDto> DrawTeamsAsync(int groupCount, string drawnBy)
+    {
+        if (string.IsNullOrWhiteSpace(drawnBy))
+        {
+            throw new ArgumentException("DrawnBy parameter is required.");
+        }
+
+        if (groupCount != 4 && groupCount != 8)
+        {
+            throw new ArgumentException("Group count must be either 4 or 8.");
+        }
+
+        var allTeams = await _context.Teams.Include(t => t.Country).ToListAsync();
+
+        var groups = GenerateGroupDtos(groupCount, allTeams);
+
+        foreach (var group in groups)
+        {
+            foreach (var teamDto in group.Teams)
+            {
+                if (!await _context.Teams.AnyAsync(t => t.Name == teamDto.Name))
+                {
+                    var newTeam = new Team { Name = teamDto.Name };
+                    _context.Teams.Add(newTeam);
+                }
+            }
+        }
+
+        await _context.SaveChangesAsync();
+
+        var drawResult = new DrawResultDto
         {
             DrawnBy = drawnBy,
             Groups = groups
         };
 
-        _context.DrawResults.Add(drawResult);
-        await _context.SaveChangesAsync();
-
         return drawResult;
     }
 
-    private List<Group> GenerateGroups(int groupCount, List<Team> allTeams)
+
+    private List<GroupDto> GenerateGroupDtos(int groupCount, List<Team> allTeams)
     {
-        var groups = Enumerable.Range(0, groupCount)
-            .Select(i => new Group { GroupName = ((char)('A' + i)).ToString() })
-            .ToList();
+        var teamsByCountry = allTeams
+            .GroupBy(t => t.Country.Name)
+            .ToDictionary(g => g.Key, g => g.ToList());
 
-        var teamsPerGroup = groupCount == 4 ? 8 : 4;
+        var groups = new List<GroupDto>();
 
-        var shuffledTeams = allTeams.OrderBy(t => Guid.NewGuid()).ToList();
-        var countryGroups = shuffledTeams.GroupBy(t => t.Country)
-                                         .ToDictionary(g => g.Key, g => new Queue<Team>(g));
-
-
-
-        for (int i = 0; i < teamsPerGroup; i++)
+        for (int i = 0; i < groupCount; i++)
         {
-            foreach (var group in groups)
+            var group = new GroupDto
             {
-                foreach (var country in countryGroups.Keys.ToList())
+                GroupName = ((char)('A' + i)).ToString(),
+                Teams = new List<TeamDto>()
+            };
+
+            groups.Add(group);
+        }
+
+        var countryKeys = teamsByCountry.Keys.ToList();
+        var shuffledCountryKeys = countryKeys.OrderBy(c => Guid.NewGuid()).ToList();
+
+        int currentGroupIndex = 0;
+
+        foreach (var countryKey in shuffledCountryKeys)
+        {
+            var teams = teamsByCountry[countryKey];
+
+            if (teams.Count > groupCount)
+            {
+                foreach (var team in teams)
                 {
-                    if (countryGroups[country].Count > 0) {
-                        group.Teams.Add(countryGroups[country].Dequeue());
-                        break;
-                    }
+                    groups[currentGroupIndex].Teams.Add(new TeamDto { Name = team.Name });
+
+                    currentGroupIndex = (currentGroupIndex + 1) % groupCount;
+                }
+            }
+            else
+            {
+                foreach (var team in teams)
+                {
+                    groups[currentGroupIndex].Teams.Add(new TeamDto { Name = team.Name });
+                    currentGroupIndex = (currentGroupIndex + 1) % groupCount;
                 }
             }
         }

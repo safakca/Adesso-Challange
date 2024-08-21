@@ -1,9 +1,9 @@
-﻿using AdessoWorldLeague.Models;
+﻿using AdessoWorldLeague.Services.Dtos;
 
 namespace AdessoWorldLeague.Services;
 //Abstract
 public interface IDrawService
 {
-    Task<DrawResult> DrawTeamsAsync(int groupCount, string drawnBy);
+    Task<DrawResultDto> DrawTeamsAsync(int groupCount, string drawnBy);
 }
 

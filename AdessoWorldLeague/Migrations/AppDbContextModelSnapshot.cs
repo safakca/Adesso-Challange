@@ -22,6 +22,29 @@ namespace AdessoWorldLeague.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("AdessoWorldLeague.Models.Country", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Countries", (string)null);
+                });
+
             modelBuilder.Entity("AdessoWorldLeague.Models.DrawResult", b =>
                 {
                     b.Property<int>("Id")
@@ -81,9 +104,8 @@ namespace AdessoWorldLeague.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Country")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<int>("CountryId")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -100,6 +122,8 @@ namespace AdessoWorldLeague.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CountryId");
+
                     b.HasIndex("GroupId");
 
                     b.ToTable("Teams", (string)null);
@@ -114,9 +138,22 @@ namespace AdessoWorldLeague.Migrations
 
             modelBuilder.Entity("AdessoWorldLeague.Models.Team", b =>
                 {
+                    b.HasOne("AdessoWorldLeague.Models.Country", "Country")
+                        .WithMany("Teams")
+                        .HasForeignKey("CountryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("AdessoWorldLeague.Models.Group", null)
                         .WithMany("Teams")
                         .HasForeignKey("GroupId");
+
+                    b.Navigation("Country");
+                });
+
+            modelBuilder.Entity("AdessoWorldLeague.Models.Country", b =>
+                {
+                    b.Navigation("Teams");
                 });
 
             modelBuilder.Entity("AdessoWorldLeague.Models.DrawResult", b =>

@@ -14,12 +14,21 @@ public class DrawController : ControllerBase
         _drawService = drawService;
     }
 
-    [HttpPost("draw")]
-    public async Task<IActionResult> DrawTeams([FromQuery] int groupCount, [FromQuery] string drawnBy) {
-        if (string.IsNullOrWhiteSpace(drawnBy))
-            return BadRequest("DrawnBy parameter is required.");
-
-        var result = await _drawService.DrawTeamsAsync(groupCount: groupCount, drawnBy: drawnBy);
-        return Ok(result);
+    [HttpPost("draw-teams")]
+    public async Task<IActionResult> DrawTeams(int groupCount, string drawnBy)
+    {
+        try
+        {
+            var result = await _drawService.DrawTeamsAsync(groupCount, drawnBy);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+        }
     }
 }
